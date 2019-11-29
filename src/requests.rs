@@ -22,6 +22,18 @@ use std::default::Default;
 // Include the model classes
 use super::models::*;
 
+/// Helper macro that generates the necessary stringification for the @type attribute
+/// of the API requests.
+macro_rules! class_type_def {
+    ($x:ident) => {
+        impl $x {
+            fn class_type_def() -> String {
+                stringify!($x).to_string()
+            }
+        }
+    };
+}
+
 #[derive(Debug, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ReadRecordRequest {
@@ -54,26 +66,20 @@ impl Default for ReadRecordRequest {
     }
 }
 
-#[derive(Debug, Serialize)]
+#[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListSchemasRequest {
     identity: FederatedIdentity,
     query_id: String,
     catalog_name: String,
-    #[serde(rename(serialize = "@type"))]
+    #[serde(
+        rename(serialize = "@type"),
+        default = "ListSchemasRequest::class_type_def"
+    )]
     class_type: String,
 }
 
-impl Default for ListSchemasRequest {
-    fn default() -> Self {
-        ListSchemasRequest {
-            identity: FederatedIdentity::default(),
-            query_id: String::new(),
-            catalog_name: String::new(),
-            class_type: "ListSchemasRequest".to_owned(),
-        }
-    }
-}
+class_type_def!(ListSchemasRequest);
 
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
@@ -81,32 +87,30 @@ pub struct ListSchemasResponse {
     pub catalog_name: String,
     request_type: String,
     pub schemas: Vec<String>,
-    #[serde(rename(deserialize = "@type"))]
+    #[serde(
+        rename(deserialize = "@type"),
+        default = "ListSchemasResponse::class_type_def"
+    )]
     class_type: String,
 }
 
-#[derive(Debug, Serialize)]
+class_type_def!(ListSchemasResponse);
+
+#[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct ListTablesRequest {
     identity: FederatedIdentity,
     query_id: String,
     catalog_name: String,
     schema_name: String,
-    #[serde(rename(serialize = "@type"))]
+    #[serde(
+        rename(serialize = "@type"),
+        default = "ListTablesRequest::class_type_def"
+    )]
     class_type: String,
 }
 
-impl Default for ListTablesRequest {
-    fn default() -> Self {
-        ListTablesRequest {
-            identity: FederatedIdentity::default(),
-            query_id: String::new(),
-            catalog_name: String::new(),
-            schema_name: String::new(),
-            class_type: "ListTablesRequest".to_owned(),
-        }
-    }
-}
+class_type_def!(ListTablesRequest);
 
 impl ListTablesRequest {
     pub fn new(query_id: &String, catalog_name: &String, schema: &String) -> Self {
@@ -123,7 +127,10 @@ impl ListTablesRequest {
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct ListTablesResponse {
-    #[serde(rename(deserialize = "@type"))]
+    #[serde(
+        rename(deserialize = "@type"),
+        default = "ListTablesResponse::class_type_def"
+    )]
     class_type: String,
 
     pub catalog_name: String,
@@ -131,7 +138,9 @@ pub struct ListTablesResponse {
     request_type: String,
 }
 
-#[derive(Debug, Serialize)]
+class_type_def!(ListTablesResponse);
+
+#[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetTableRequest {
     identity: FederatedIdentity,
@@ -139,9 +148,14 @@ pub struct GetTableRequest {
     catalog_name: String,
     table_name: TableName,
 
-    #[serde(rename(serialize = "@type"))]
+    #[serde(
+        rename(serialize = "@type"),
+        default = "GetTableRequest::class_type_def"
+    )]
     class_type: String,
 }
+
+class_type_def!(GetTableRequest);
 
 impl GetTableRequest {
     pub fn new(catalog_name: String, schema_name: String, table_name: String) -> Self {
@@ -158,7 +172,10 @@ impl GetTableRequest {
 #[derive(Debug, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct GetTableResponse {
-    #[serde(rename(deserialize = "@type"))]
+    #[serde(
+        rename(deserialize = "@type"),
+        default = "GetTableResponse::class_type_def"
+    )]
     class_type: String,
 
     pub catalog_name: String,
@@ -166,6 +183,8 @@ pub struct GetTableResponse {
     pub schema: Schema,
     request_type: String,
 }
+
+class_type_def!(GetTableResponse);
 
 #[derive(Debug, Default, Serialize)]
 #[serde(rename_all = "camelCase")]
@@ -179,9 +198,14 @@ pub struct GetTableLayoutRequest {
     // Is a set
     partition_cols: Vec<String>,
 
-    #[serde(rename(serialize = "@type"))]
+    #[serde(
+        rename(serialize = "@type"),
+        default = "GetTableLayoutRequest::class_type_def"
+    )]
     class_type: String,
 }
+
+class_type_def!(GetTableLayoutRequest);
 
 impl GetTableLayoutRequest {
     pub fn new(
@@ -201,40 +225,99 @@ impl GetTableLayoutRequest {
             constraints,
             schema,
             partition_cols,
-            class_type: "GetTableLayoutRequest".to_string(),
+            class_type: Self::class_type_def(),
         }
     }
 }
 
-#[derive(Debug, Default, Deserialize)]
+#[derive(Debug, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetTableLayoutResponse {
-    #[serde(rename(deserialize = "@type"))]
+    #[serde(
+        rename(deserialize = "@type"),
+        default = "GetTableLayoutResponse::class_type_def"
+    )]
     class_type: String,
     request_type: String,
 
     pub catalog_name: String,
     pub table_name: TableName,
-    pub partitions: HashMap<String, String>,
+    pub partitions: Block,
 }
+
+class_type_def!(GetTableLayoutResponse);
 
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct GetSplitsRequest {
+    #[serde(default)]
     identity: FederatedIdentity,
+    #[serde(
+        rename(serialize = "@type"),
+        default = "GetSplitsRequest::class_type_def"
+    )]
+    class_type: String,
     query_id: String,
     catalog_name: String,
     table_name: TableName,
     partitions: Block,
     partition_cols: Vec<String>,
     constraints: Constraints,
-    continuation_token: String,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    continuation_token: Option<String>,
 }
+
+class_type_def!(GetSplitsRequest);
+
+impl GetSplitsRequest {
+    pub fn new(
+        query_id: String,
+        catalog_name: String,
+        table_name: TableName,
+        partitions: Block,
+        partition_cols: Vec<String>,
+        constraints: Constraints,
+        continuation_token: Option<String>,
+    ) -> Self {
+        GetSplitsRequest {
+            identity: FederatedIdentity::default(),
+            class_type: Self::class_type_def(),
+            query_id: query_id,
+            catalog_name: catalog_name,
+            table_name: table_name,
+            partitions: partitions,
+            partition_cols: partition_cols,
+            constraints: constraints,
+            continuation_token: continuation_token,
+        }
+    }
+}
+
+#[derive(Debug, Default, Deserialize, Serialize)]
+#[serde(rename_all = "camelCase")]
+pub struct GetSplitsResponse {
+    #[serde(
+        rename(deserialize = "@type"),
+        default = "GetSplitsResponse::class_type_def"
+    )]
+    class_type: String,
+    request_type: String,
+}
+
+class_type_def!(GetSplitsResponse);
 
 #[cfg(test)]
 mod test {
 
     use super::*;
+
+    #[test]
+    fn test_class_type_macro() {
+        assert_eq!(
+            "GetTableRequest".to_string(),
+            GetTableRequest::class_type_def()
+        );
+    }
 
     #[test]
     fn json_serializer() {
@@ -285,7 +368,8 @@ mod test {
                     "log_stream"
                 ],
                 "constraints":{"summary":{}},
-                "continuationToken" : "abc"
+                "continuationToken" : "abc",
+                "@type" : "GetTableLayoutRequest"
             }"#;
 
         let val: serde_json::Value = serde_json::from_str(&json).unwrap();

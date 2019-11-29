@@ -63,7 +63,7 @@ impl Default for FederatedIdentity {
 }
 
 /// Value struct storing information about the table name.
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct TableName {
     schema_name: String,
@@ -80,7 +80,7 @@ impl TableName {
 }
 
 /// This is a value container for an Arrow schema object.
-#[derive(Debug, Default, Serialize, Deserialize)]
+#[derive(Debug, Default, Serialize, Deserialize, Clone)]
 #[serde(rename_all = "camelCase")]
 pub struct Schema {
     schema: String,

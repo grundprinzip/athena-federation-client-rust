@@ -145,8 +145,30 @@ impl Planner {
         return res;
     }
 
-    pub fn get_splits() {
-        //let _req = requests::GetSplitsRequest::default();
+    pub fn get_splits(
+        &mut self,
+        query_id: String,
+        catalog_name: String,
+        table_name: models::TableName,
+        partitions: models::Block,
+        partition_cols: Vec<String>,
+        constraints: models::Constraints,
+        continuation_token: Option<String>,
+    ) -> requests::GetSplitsResponse {
+        let req = requests::GetSplitsRequest::new(
+            query_id,
+            catalog_name,
+            table_name,
+            partitions,
+            partition_cols,
+            constraints,
+            continuation_token,
+        );
+        let body = serde_json::to_string(&req).unwrap();
+        trace!("{:?}", body);
+        let res: requests::GetSplitsResponse = self.invoke(body);
+        trace!("{:?}", res);
+        return res;
     }
 }
 
