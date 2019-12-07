@@ -16,7 +16,6 @@
 // under the License.
 
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
 use std::default::Default;
 
 // Include the model classes
@@ -119,7 +118,7 @@ impl ListTablesRequest {
             query_id: query_id.clone(),
             catalog_name: catalog_name.clone(),
             schema_name: schema.clone(),
-            class_type: "ListTablesRequest".to_owned(),
+            class_type: Self::class_type_def(),
         }
     }
 }
@@ -164,7 +163,7 @@ impl GetTableRequest {
             catalog_name: catalog_name,
             query_id: String::new(),
             table_name: TableName::new(schema_name, table_name),
-            class_type: "GetTableRequest".to_owned(),
+            class_type: Self::class_type_def(),
         }
     }
 }
