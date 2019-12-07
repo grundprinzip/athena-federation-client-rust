@@ -22,7 +22,6 @@ use rusoto_lambda::{InvocationRequest, InvocationResponse, Lambda, LambdaClient}
 use serde::de::DeserializeOwned;
 use serde::Deserialize;
 use std::default::Default;
-use std::str;
 
 #[derive(Default, Debug, Clone)]
 pub struct Configuration {

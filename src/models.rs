@@ -20,7 +20,6 @@ use std::collections::HashMap;
 use std::default::Default;
 
 use arrow;
-use arrow::array::Int64Array;
 use arrow::ipc;
 use arrow::ipc::file::reader as rr;
 use arrow::ipc::gen::Message::MessageHeader;
@@ -28,10 +27,7 @@ use arrow::record_batch::RecordBatch;
 
 use serde;
 use serde::de;
-use serde::de::Deserializer;
 use serde::de::Error as _;
-use serde::ser;
-use serde::ser::Error as _;
 use serde::ser::SerializeStruct;
 use serde::ser::Serializer;
 use serde::{Deserialize, Serialize};
@@ -99,6 +95,7 @@ impl Schema {
 
     /// Returns the arrow Schema object for the column. If the schema has not yet
     /// been decoded, it will decode it from the binary string representation.
+    /// TOOD(magrund) We should implement a deserialize_with function instesad of this wrapper.
     pub fn get_schema(&mut self) -> Option<arrow::datatypes::Schema> {
         trace!("Deserializing schema");
         if self.arrow_schema.is_some() {
@@ -130,6 +127,9 @@ impl Schema {
     }
 }
 
+/// This struct represents the block as transmitted over the wire from
+/// the SDK. This struct is used to cache the serialized representation
+/// to make it easy to send it back to the lambda functions.
 #[derive(Debug)]
 struct SerializedBlock {
     schema: String,
@@ -140,17 +140,17 @@ struct SerializedBlock {
 /// This is a value container for an Arrow schema object.
 #[derive(Debug)]
 pub struct Block {
-    records: arrow::record_batch::RecordBatch,
+    /// Holds a RecordBatch of Arrow values.
+    records: RecordBatch,
+    /// This member caches the serialized representation of
+    /// the decoded values stored in records.
     serialized: SerializedBlock,
 }
 
 impl Block {
-    fn new(
-        records: arrow::record_batch::RecordBatch,
-        schema_str: String,
-        records_str: String,
-        a_id: String,
-    ) -> Self {
+    /// Initializes the block with the decoded value and the
+    /// encoded members of the Block.
+    fn new(records: RecordBatch, schema_str: String, records_str: String, a_id: String) -> Self {
         let serialized = SerializedBlock {
             schema: schema_str,
             records: records_str,
@@ -188,7 +188,7 @@ impl<'de> Deserialize<'de> for Block {
         let helper: Value = Deserialize::deserialize(deserializer)?;
         let tuple = (
             decode_value(helper.get("schema")),
-            decode_value(dbg!(helper.get("records"))),
+            decode_value(helper.get("records")),
         );
 
         match tuple {
@@ -200,10 +200,10 @@ impl<'de> Deserialize<'de> for Block {
 
                 if fbs_schema.header_type() == MessageHeader::Schema {
                     if let Some(fbs_schema) = fbs_schema.header_as_schema() {
-                        let ss = dbg!(ipc::convert::fb_to_schema(fbs_schema));
+                        let ss = ipc::convert::fb_to_schema(fbs_schema);
 
                         if fbs_records.header_type() == MessageHeader::RecordBatch {
-                            let body_length = dbg!(fbs_records.bodyLength());
+                            let body_length = fbs_records.bodyLength();
 
                             if let Some(fbs_records) = fbs_records.header_as_record_batch() {
                                 // Read fom the record batch
@@ -253,23 +253,42 @@ impl Serialize for Block {
     }
 }
 
-#[derive(Debug, Serialize, Default)]
+/// A `SpillLocation` contains the metadata to be passed to the
+/// lambda function where to spill values if the result becomes larger
+/// than a certain threshold value configured in the request.
+///
+/// The knowledge about the `SpillLocation` is used for the caller to
+/// fetch values from S3 instead of fetching them as an inline result
+/// from the invocation of the lambda function.
+#[derive(Debug, Serialize, Default, Deserialize)]
 #[serde(rename_all = "camelCase")]
 pub struct SpillLocation {
     bucket: String,
     key: String,
     directory: bool,
+    #[serde(rename = "@type", default = "SpillLocation::class_type_def")]
+    class_type: String,
 }
 
-#[derive(Debug, Serialize, Default)]
+impl SpillLocation {
+    fn class_type_def() -> String {
+        "S3SpillLocation".to_string()
+    }
+}
+
+/// Value struct containing information about the encryption key used
+/// by the lambda function to encrypt the results in S3.
+#[derive(Debug, Serialize, Deserialize, Default)]
+#[serde(rename_all = "camelCase")]
+pub struct EncryptionKey {}
+
+/// A `Split` is a work unit used in the distribution of requests.
+#[derive(Debug, Serialize, Deserialize, Default)]
 #[serde(rename_all = "camelCase")]
 pub struct Split {
     spill_location: SpillLocation,
-
-    // This field should not be serialized
-    #[serde(skip_serializing)]
-    encrypted: bool,
     properties: HashMap<String, String>,
+    encryption_key: Option<EncryptionKey>,
 }
 
 impl Split {
@@ -281,15 +300,19 @@ impl Split {
             bucket: bucket,
             key: key,
             directory: true,
+            class_type: SpillLocation::class_type_def(),
         };
         Split {
             spill_location: spill_loc,
-            encrypted: false,
             properties: HashMap::new(),
+            encryption_key: None,
         }
     }
 }
 
+/// Constraints are a complicated piece of technology that was
+/// inherited by Presto. and we don't have a good way yet to
+/// deal with it.
 #[derive(Debug, Deserialize, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub struct Constraints {
@@ -329,7 +352,6 @@ mod test {
             String::from("magrund-ops"),
             String::from("federation-spill"),
         );
-        assert!(!split.encrypted);
         assert!(split.spill_location.directory);
         assert!(split.properties.is_empty());
     }
@@ -358,8 +380,50 @@ mod test {
             "aId": "52fb8f5f-e2d0-4345-84d4-5f651bee361b"
             }"#;
 
-        let block: Block = dbg!(serde_json::from_str(json).unwrap());
+        let block: Block = serde_json::from_str(json).unwrap();
         assert_eq!(1, block.records.num_rows());
         assert_eq!(3, block.records.num_columns());
+    }
+
+    #[test]
+    fn test_spill_location() {
+        let json = r#"
+        {
+            "@type": "S3SpillLocation",
+            "bucket": "magrund-ath-fed",
+            "key": "athena-spill//e8300bd6-0737-4dfc-9af3-552fe160054f",
+            "directory": true
+        }
+        "#;
+
+        let sl_val: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let sl: SpillLocation = serde_json::from_str(json).unwrap();
+        assert_eq!("magrund-ath-fed".to_string(), sl.bucket);
+        let val: serde_json::Value = serde_json::to_value(sl).unwrap();
+        assert_eq!(sl_val, val);
+    }
+
+    #[test]
+    fn test_split_serde() {
+        let json = r#"{
+            "spillLocation": {
+                "@type": "S3SpillLocation",
+                "bucket": "magrund-ath-fed",
+                "key": "athena-spill//e8300bd6-0737-4dfc-9af3-552fe160054f",
+                "directory": true
+            },
+            "encryptionKey": null,
+            "properties": {
+                "log_group": "/aws/lambda/cwtest",
+                "log_stream_bytes": "0",
+                "log_stream": "2019/11/16/[$LATEST]05346b61111b4ad696d94ba60e4734b6"
+            }
+        }"#;
+
+        let sl_val: serde_json::Value = serde_json::from_str(&json).unwrap();
+        let sl: Split = serde_json::from_str(json).unwrap();
+        //assert_eq!("magrund-ath-fed".to_string(), sl.bucket);
+        let val: serde_json::Value = serde_json::to_value(sl).unwrap();
+        assert_eq!(sl_val, val);
     }
 }

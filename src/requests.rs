@@ -369,7 +369,7 @@ mod test {
                 ],
                 "constraints":{"summary":{}},
                 "continuationToken" : "abc",
-                "@type" : "GetTableLayoutRequest"
+                "@type" : "GetSplitsRequest"
             }"#;
 
         let val: serde_json::Value = serde_json::from_str(&json).unwrap();
