@@ -18,7 +18,7 @@
 extern crate rust_lambda_fed;
 
 use rlf::models::*;
-use rlf::{Configuration, Planner};
+use rlf::{Configuration, Planner, Executor};
 use rust_lambda_fed as rlf;
 
 extern crate pretty_env_logger;
@@ -131,4 +131,42 @@ fn test_get_splits() {
         Constraints::default(),
         None,
     ));
+}
+
+#[test]
+fn test_with_execution() {
+    let c = setup();
+    let mut p = Planner::new(c.config.clone());
+    let mut val = dbg!(p.get_table(
+        "".to_owned(),
+        "/aws/lambda/cwtest".to_owned(),
+        "2019/11/16/[$latest]05346b61111b4ad696d94ba60e4734b6".to_owned(),
+    ));
+
+    let schema = val.schema.get_schema().unwrap();
+    let s = dbg!(schema.metadata()).get("partitionCols");
+
+    let layout = p.get_table_layout(
+        val.catalog_name.clone(),
+        val.table_name.clone(),
+        Constraints::default(),
+        val.schema.clone(),
+        vec![s.unwrap().clone()],
+    );
+
+    let splits = dbg!(p.get_splits(
+        "".to_string(),
+        val.catalog_name,
+        val.table_name,
+        layout.partitions,
+        vec![s.unwrap().clone()],
+        Constraints::default(),
+        None,
+    ));
+
+    let mut e = Executor::new(c.config.clone());
+    // For each Split call the executor
+    
+    
+
 }

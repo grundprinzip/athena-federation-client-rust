@@ -171,6 +171,28 @@ impl Planner {
     }
 }
 
+/// Wrapper class for the execution of a request against the lambda function.
+pub struct Executor {
+    config: Configuration,
+    client: LambdaClient,
+}
+
+impl Executor {
+    /// Instantiates a new Planner object configured with a Configuration
+    /// object.
+    pub fn new(c: Configuration) -> Self {
+        let r = c.region.as_str().parse().unwrap();
+        Self {
+            config: c,
+            client: LambdaClient::new(r),
+        }
+    }
+
+    pub fn read_records(&mut self, req: requests::ReadRecordRequest) {
+        trace!("Entering read_records()");
+    }
+}
+
 #[cfg(test)]
 mod test {
 

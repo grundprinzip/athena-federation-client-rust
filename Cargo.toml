@@ -21,6 +21,10 @@ version = "0.1.0"
 authors = ["Martin Grund <magrund@amazon.com>"]
 edition = "2018"
 
+[lib]
+name = "rust_lambda_federation"
+crate-type = ["dylib"]
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

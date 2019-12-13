@@ -26,3 +26,4 @@ pub mod requests;
 
 pub use self::api::Configuration;
 pub use self::api::Planner;
+pub use self::api::Executor;
